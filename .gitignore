@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Keep only the approved, no-card 3D avatar set in the public repository.
+public/avatars/*.png
+!public/avatars/*-3d.png

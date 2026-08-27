@@ -1,0 +1,35 @@
+backend:
+  name: github
+  repo: ljdubxud123103/skill-atlas
+  branch: main
+  base_url: https://YOUR-OAUTH-PROXY.example.com
+  auth_endpoint: auth
+site_url: https://ljdubxud123103.github.io/skill-atlas/
+media_folder: public/avatars
+public_folder: /avatars
+publish_mode: simple
+collections:
+  - name: skills
+    label: Skills
+    folder: public/content/skills
+    create: false
+    extension: md
+    format: frontmatter
+    fields:
+      - { label: Name, name: name, widget: string }
+      - { label: Description, name: description, widget: text }
+      - { label: Version, name: version, widget: string, required: false }
+      - { label: Updated, name: updated, widget: string, required: false }
+      - { label: Body, name: body, widget: markdown }
+  - name: sites
+    label: Sites
+    folder: public/content/sites
+    create: true
+    extension: md
+    format: frontmatter
+    fields:
+      - { label: Name, name: name, widget: string }
+      - { label: Description, name: description, widget: text }
+      - { label: Version, name: version, widget: string, required: false }
+      - { label: Updated, name: updated, widget: string, required: false }
+      - { label: Body, name: body, widget: markdown }
