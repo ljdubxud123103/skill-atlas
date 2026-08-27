@@ -67,9 +67,13 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
     return () => window.clearInterval(interval);
   }, [animating, navigate]);
 
-  const roleFor = (index: number): SlideRole => {
+  const roleFor = (index: number): SlideRole | 'off' => {
     const distance = modulo(index - activeIndex, HERO_IMAGES.length);
-    return distance === 0 ? 'center' : distance === 1 ? 'right' : distance === 2 ? 'back' : 'left';
+    if (distance === 0) return 'center';
+    if (distance === 1) return 'right';
+    if (distance === HERO_IMAGES.length - 1) return 'left';
+    if (distance === 2) return 'back';
+    return 'off';
   };
 
   const respond = () => {
@@ -135,7 +139,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
 
         <div className="hero__roster" aria-label="首屏角色快速选择">
           {ENTRIES.map((entry, index) => (
-            <button type="button" key={entry.slug} className={index === activeIndex ? 'active' : ''} onClick={() => index < HERO_IMAGES.length ? goTo(index) : open(entry)} aria-label={`切换到 ${entry.name}`}>
+            <button type="button" key={entry.slug} className={index === activeIndex ? 'active' : ''} onClick={() => goTo(index)} aria-label={`切换到 ${entry.name}`}>
               <span className="hero__roster-number">{String(index + 1).padStart(2, '0')}</span>
               <img src={`${BASE_URL}${entry.avatar}`} alt="" />
               <span>{entry.name}</span>

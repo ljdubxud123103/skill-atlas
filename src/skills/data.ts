@@ -55,17 +55,18 @@ export const ENTRIES: Entry[] = raw.map(([slug,name,kind,summary,scenarios,versi
   slug, name, kind: kind as EntryKind, summary, scenarios: [...scenarios], version, updated, tags: [...tags], avatar: LOCAL_AVATARS[slug] ?? FIGURINES[avatar], avatarLabel, personality: personality as Personality, contentPath: `content/${kind === 'skill' ? 'skills' : 'sites'}/${slug}.md`, ...(externalUrl ? { externalUrl } : {}),
 }));
 
-const HERO_KEYS = [
-  'yxw-video-prompt-director',
-  'universal-video-prompt-director',
-  'female-3d-microdrama-storyboard',
-  'character-asset-prompt',
-] as const;
+// The first four colors and transparent renders follow the supplied TOONHUB
+// prompt. Every remaining slide uses one of the owner's own extracted figures.
+const HERO_PALETTE = [
+  '#F4845F', '#6BBF7A', '#E882B4', '#6EB5FF', '#C6A45B', '#6E9C9C',
+  '#B47D66', '#7B8DB8', '#C56F85', '#79926F', '#9A7A58', '#6E8798',
+  '#AD7698', '#8F8A5E', '#5F8494',
+];
 
-export const HERO_IMAGES = HERO_KEYS.map((key, index) => ({
-  // The prompt's four cutout renders are transparent PNGs, so the hero reads as
-  // dimensional figures on the stage instead of framed portrait cards.
-  src: FIGURINES[index],
-  bg: ['#F4845F', '#6BBF7A', '#E882B4', '#6EB5FF'][index],
-  panel: ['#F79B7F', '#85CC92', '#ED9DC4', '#8DC4FF'][index],
+export const HERO_IMAGES = ENTRIES.map((entry, index) => ({
+  // Cutouts keep the user's characters dimensional on the stage, without a
+  // rectangular portrait background.
+  src: entry.avatar.replace('-3d.png', '-cutout.png'),
+  bg: HERO_PALETTE[index % HERO_PALETTE.length],
+  panel: HERO_PALETTE[index % HERO_PALETTE.length],
 }));
