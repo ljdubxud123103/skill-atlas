@@ -25,12 +25,20 @@ const dialogueLines: Record<Entry['personality'], string[]> = {
 };
 
 const sfxProfiles: Record<Entry['personality'], { frequencies: number[]; type: OscillatorType; gain: number }> = {
-  bold: { frequencies: [130, 260], type: 'sawtooth', gain: 0.11 },
-  calm: { frequencies: [392, 523], type: 'sine', gain: 0.075 },
-  playful: { frequencies: [523, 784], type: 'triangle', gain: 0.09 },
-  warm: { frequencies: [261, 330], type: 'sine', gain: 0.09 },
-  precise: { frequencies: [880], type: 'square', gain: 0.055 },
+  bold: { frequencies: [160, 320], type: 'triangle', gain: 0.07 },
+  calm: { frequencies: [392, 523], type: 'sine', gain: 0.05 },
+  playful: { frequencies: [523, 659, 784], type: 'triangle', gain: 0.065 },
+  warm: { frequencies: [261, 392], type: 'sine', gain: 0.065 },
+  precise: { frequencies: [660], type: 'sine', gain: 0.045 },
 };
+
+type VoiceStyle = 'comic' | 'narrator' | 'soft';
+const voiceStyles: Record<VoiceStyle, { label: string; rate: number; pitch: number; keywords: string[] }> = {
+  comic: { label: '\u6f2b\u753b\u660e\u4eae', rate: 1.04, pitch: 1.16, keywords: ['xiaoxiao', 'tingting', 'female', '\u5973'] },
+  narrator: { label: '\u4f4e\u6c89\u65c1\u767d', rate: 0.9, pitch: 0.82, keywords: ['yunxi', 'yunyang', 'male', '\u7537'] },
+  soft: { label: '\u67d4\u548c\u81ea\u7136', rate: 0.96, pitch: 1.02, keywords: ['xiaoyi', 'huihui', 'natural'] },
+};
+const voiceStyleOrder: VoiceStyle[] = ['comic', 'narrator', 'soft'];
 
 function playCharacterSfx(personality: Entry['personality']) {
   if (typeof window === 'undefined') return;
@@ -40,10 +48,15 @@ function playCharacterSfx(personality: Entry['personality']) {
   const profile = sfxProfiles[personality];
   const start = context.currentTime;
   const master = context.createGain();
+  const filter = context.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(2200, start);
+  filter.Q.setValueAtTime(0.45, start);
   master.gain.setValueAtTime(0.0001, start);
   master.gain.exponentialRampToValueAtTime(profile.gain, start + 0.018);
   master.gain.exponentialRampToValueAtTime(0.0001, start + 0.34);
-  master.connect(context.destination);
+  master.connect(filter);
+  filter.connect(context.destination);
   profile.frequencies.forEach((frequency, index) => {
     const oscillator = context.createOscillator();
     oscillator.type = profile.type;
@@ -56,13 +69,17 @@ function playCharacterSfx(personality: Entry['personality']) {
   window.setTimeout(() => { void context.close(); }, 500);
 }
 
-function speakCharacterLine(line: string, personality: Entry['personality']) {
+function speakCharacterLine(line: string, personality: Entry['personality'], style: VoiceStyle, voices: SpeechSynthesisVoice[]) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
+  const profile = voiceStyles[style];
   const utterance = new SpeechSynthesisUtterance(line);
   utterance.lang = 'zh-CN';
-  utterance.rate = personality === 'calm' ? 0.86 : personality === 'playful' ? 1.08 : 0.98;
-  utterance.pitch = personality === 'bold' ? 0.84 : personality === 'warm' ? 1.08 : personality === 'playful' ? 1.16 : 1;
+  utterance.rate = profile.rate * (personality === 'calm' ? 0.96 : personality === 'playful' ? 1.04 : 1);
+  utterance.pitch = profile.pitch * (personality === 'bold' ? 0.94 : personality === 'warm' ? 1.04 : 1);
+  const chineseVoices = voices.filter((voice) => /^(zh|cmn|yue)/i.test(voice.lang));
+  const preferred = chineseVoices.find((voice) => profile.keywords.some((keyword) => voice.name.toLowerCase().includes(keyword)));
+  utterance.voice = preferred ?? chineseVoices[0] ?? voices.find((voice) => voice.default) ?? null;
   window.speechSynthesis.speak(utterance);
 }
 
@@ -81,6 +98,8 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const [reacting, setReacting] = useState(false);
   const [reactionCycle, setReactionCycle] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>('comic');
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [reaction, setReaction] = useState('点击角色，让她回应你。双击进入完整档案。');
   const timerRef = useRef<number | null>(null);
   const reactionTimerRef = useRef<number | null>(null);
@@ -88,6 +107,14 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
 
   useEffect(() => {
     setReaction('\u70b9\u51fb\u89d2\u8272\uff0c\u8ba9\u5979\u56de\u5e94\u4f60\u3002\u53cc\u51fb\u8fdb\u5165\u5b8c\u6574\u6863\u6848\u3002');
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
   }, []);
 
   const release = useCallback(() => {
@@ -146,7 +173,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
     setReacting(true);
     if (soundEnabled) {
       playCharacterSfx(active.personality);
-      speakCharacterLine(line, active.personality);
+      speakCharacterLine(line, active.personality, voiceStyle, voices);
     }
     if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
     reactionTimerRef.current = window.setTimeout(() => setReacting(false), 820);
@@ -157,6 +184,10 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
       if (enabled && typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
       return !enabled;
     });
+  };
+
+  const cycleVoiceStyle = () => {
+    setVoiceStyle((style) => voiceStyleOrder[(voiceStyleOrder.indexOf(style) + 1) % voiceStyleOrder.length]);
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -178,6 +209,11 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
         <button type="button" className={`hero__sound-toggle ${soundEnabled ? 'is-on' : 'is-off'}`} onClick={toggleSound} aria-pressed={soundEnabled} aria-label={soundEnabled ? '关闭角色音效与台词' : '开启角色音效与台词'}>
           {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           <span>{soundEnabled ? '声音开启' : '声音静音'}</span>
+        </button>
+
+        <button type="button" className="hero__voice-toggle" onClick={cycleVoiceStyle} aria-label="切换角色音色">
+          <span className="hero__voice-dot" aria-hidden="true" />
+          <span>{voiceStyles[voiceStyle].label}</span>
         </button>
 
         <div className="hero__intro">
