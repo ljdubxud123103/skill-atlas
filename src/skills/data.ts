@@ -67,6 +67,9 @@ export const HERO_IMAGES = ENTRIES.map((entry, index) => ({
   // Cutouts keep the user's characters dimensional on the stage, without a
   // rectangular portrait background.
   src: entry.avatar.replace('-3d.png', '-cutout.png'),
+  // Each role has a dedicated interaction pose, so a click changes the body
+  // language instead of only shaking the same portrait.
+  actionSrc: index < 15 ? entry.avatar.replace('-3d.png', '-action.png') : undefined,
   bg: HERO_PALETTE[index % HERO_PALETTE.length],
   panel: HERO_PALETTE[index % HERO_PALETTE.length],
 }));

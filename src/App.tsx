@@ -53,7 +53,10 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   }, [activeIndex, animating, goTo]);
 
   useEffect(() => {
-    HERO_IMAGES.forEach(({ src }) => { const image = new Image(); image.src = src; });
+    HERO_IMAGES.forEach(({ src, actionSrc }) => {
+      const image = new Image(); image.src = src;
+      if (actionSrc) { const actionImage = new Image(); actionImage.src = actionSrc; }
+    });
     const resize = () => setMobile(window.innerWidth < 640);
     resize();
     window.addEventListener('resize', resize);
@@ -120,12 +123,13 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
               <button
                 type="button"
                 key={image.src}
-                className={`figurine figurine--${role} ${index === activeIndex && reacting ? `is-reacting is-reacting--${active.personality} reaction-pulse-${reactionCycle % 2}` : ''}`}
+                className={`figurine figurine--${role} ${image.actionSrc ? 'has-action' : ''} ${index === activeIndex && reacting ? `is-reacting is-reacting--${active.personality} reaction-pulse-${reactionCycle % 2}` : ''}`}
                 onClick={() => role === 'center' ? respond() : goTo(index)}
                 onDoubleClick={() => open(entry)}
                 aria-label={`${entry.name}，点击切换或互动，双击查看详情`}
               >
                 <span className="figurine__halo" />
+                {image.actionSrc && <img className={`figurine__action ${reacting && index === activeIndex ? 'is-visible' : ''}`} src={image.actionSrc} alt="" aria-hidden="true" draggable={false} />}
                 <img src={image.src} alt={`${entry.name} 3D 角色`} draggable={false} />
               </button>
             );

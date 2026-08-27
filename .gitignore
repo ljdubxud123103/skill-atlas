@@ -11,4 +11,5 @@ vite.config.d.ts
 public/avatars/*.png
 !public/avatars/*-3d.png
 !public/avatars/*-cutout.png
+!public/avatars/*-action.png
 .tools/
