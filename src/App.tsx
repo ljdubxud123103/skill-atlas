@@ -29,6 +29,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const [animating, setAnimating] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [reacting, setReacting] = useState(false);
+  const [reactionNonce, setReactionNonce] = useState(0);
   const [reaction, setReaction] = useState('点击角色，让她回应你。双击进入完整档案。');
   const timerRef = useRef<number | null>(null);
   const reactionTimerRef = useRef<number | null>(null);
@@ -82,9 +83,9 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const respond = () => {
     const lines = reactions[active.personality];
     setReaction(lines[Math.floor(Math.random() * lines.length)]);
-    // Toggle the class off for one frame so repeated clicks always replay the motion.
-    setReacting(false);
-    window.requestAnimationFrame(() => setReacting(true));
+    // Remount only the active image so every click restarts the motion cleanly.
+    setReactionNonce((nonce) => nonce + 1);
+    setReacting(true);
     if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
     reactionTimerRef.current = window.setTimeout(() => setReacting(false), 820);
   };
@@ -126,7 +127,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
                 aria-label={`${entry.name}，点击切换或互动，双击查看详情`}
               >
                 <span className="figurine__halo" />
-                <img src={image.src} alt={`${entry.name} 3D 角色`} draggable={false} />
+                <img key={`${image.src}-${index === activeIndex ? reactionNonce : 0}`} src={image.src} alt={`${entry.name} 3D 角色`} draggable={false} />
               </button>
             );
           })}
