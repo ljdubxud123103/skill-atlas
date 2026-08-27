@@ -28,8 +28,10 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [reacting, setReacting] = useState(false);
   const [reaction, setReaction] = useState('点击角色，让她回应你。双击进入完整档案。');
   const timerRef = useRef<number | null>(null);
+  const reactionTimerRef = useRef<number | null>(null);
   const active = ENTRIES[activeIndex];
 
   const release = useCallback(() => {
@@ -57,6 +59,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
     return () => {
       window.removeEventListener('resize', resize);
       if (timerRef.current) window.clearTimeout(timerRef.current);
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
     };
   }, []);
 
@@ -79,6 +82,11 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const respond = () => {
     const lines = reactions[active.personality];
     setReaction(lines[Math.floor(Math.random() * lines.length)]);
+    // Toggle the class off for one frame so repeated clicks always replay the motion.
+    setReacting(false);
+    window.requestAnimationFrame(() => setReacting(true));
+    if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+    reactionTimerRef.current = window.setTimeout(() => setReacting(false), 820);
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -112,7 +120,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
               <button
                 type="button"
                 key={image.src}
-                className={`figurine figurine--${role}`}
+                className={`figurine figurine--${role} ${index === activeIndex && reacting ? `is-reacting is-reacting--${active.personality}` : ''}`}
                 onClick={() => role === 'center' ? respond() : goTo(index)}
                 onDoubleClick={() => open(entry)}
                 aria-label={`${entry.name}，点击切换或互动，双击查看详情`}
@@ -124,7 +132,7 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
           })}
         </div>
 
-        <div className="hero__speech" aria-live="polite"><Sparkles size={15} /> {reaction}</div>
+        <div className={`hero__speech ${reacting ? 'is-reacting' : ''}`} aria-live="polite"><Sparkles size={15} /> {reaction}</div>
 
         <div className="hero__meta">
           <div className="hero__meta-copy" key={active.slug}>
