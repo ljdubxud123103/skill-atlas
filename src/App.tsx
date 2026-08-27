@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ExternalLink, Search, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import { Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { ENTRIES, HERO_IMAGES, type Entry } from './skills/data';
 
@@ -16,6 +16,56 @@ const reactions: Record<Entry['personality'], string[]> = {
 
 type SlideRole = 'center' | 'left' | 'right' | 'back';
 
+const dialogueLines: Record<Entry['personality'], string[]> = {
+  bold: ['\u955c\u5934\u5c31\u4f4d\uff0c\u51c6\u5907\u5f00\u62cd\u3002', '\u522b\u7728\u773c\uff0c\u4e0b\u4e00\u5e27\u66f4\u7cbe\u5f69\u3002'],
+  calm: ['\u6211\u5df2\u7ecf\u628a\u6d41\u7a0b\u7406\u987a\u4e86\u3002', '\u6162\u4e00\u70b9\uff0c\u7ec6\u8282\u4f1a\u81ea\u5df1\u51fa\u73b0\u3002'],
+  playful: ['\u88ab\u4f60\u53d1\u73b0\u5566\uff01', '\u4eca\u5929\u8981\u4e0d\u8981\u8bd5\u8bd5\u65b0\u73a9\u6cd5\uff1f'],
+  warm: ['\u6765\uff0c\u8ddf\u6211\u4e00\u8d77\u628a\u6545\u4e8b\u8bb2\u51fa\u6765\u3002', '\u6536\u5230\u4f60\u7684\u773c\u795e\u4e86\u3002'],
+  precise: ['\u53c2\u6570\u9501\u5b9a\uff0c\u5f00\u59cb\u5de5\u4f5c\u3002', '\u6bcf\u4e00\u683c\u90fd\u503c\u5f97\u6838\u5bf9\u3002'],
+};
+
+const sfxProfiles: Record<Entry['personality'], { frequencies: number[]; type: OscillatorType; gain: number }> = {
+  bold: { frequencies: [130, 260], type: 'sawtooth', gain: 0.11 },
+  calm: { frequencies: [392, 523], type: 'sine', gain: 0.075 },
+  playful: { frequencies: [523, 784], type: 'triangle', gain: 0.09 },
+  warm: { frequencies: [261, 330], type: 'sine', gain: 0.09 },
+  precise: { frequencies: [880], type: 'square', gain: 0.055 },
+};
+
+function playCharacterSfx(personality: Entry['personality']) {
+  if (typeof window === 'undefined') return;
+  const AudioContextCtor = (window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext | undefined;
+  if (!AudioContextCtor) return;
+  const context = new AudioContextCtor();
+  const profile = sfxProfiles[personality];
+  const start = context.currentTime;
+  const master = context.createGain();
+  master.gain.setValueAtTime(0.0001, start);
+  master.gain.exponentialRampToValueAtTime(profile.gain, start + 0.018);
+  master.gain.exponentialRampToValueAtTime(0.0001, start + 0.34);
+  master.connect(context.destination);
+  profile.frequencies.forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    oscillator.type = profile.type;
+    oscillator.frequency.setValueAtTime(frequency, start + index * 0.065);
+    oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.82, start + 0.3);
+    oscillator.connect(master);
+    oscillator.start(start + index * 0.065);
+    oscillator.stop(start + 0.36);
+  });
+  window.setTimeout(() => { void context.close(); }, 500);
+}
+
+function speakCharacterLine(line: string, personality: Entry['personality']) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(line);
+  utterance.lang = 'zh-CN';
+  utterance.rate = personality === 'calm' ? 0.86 : personality === 'playful' ? 1.08 : 0.98;
+  utterance.pitch = personality === 'bold' ? 0.84 : personality === 'warm' ? 1.08 : personality === 'playful' ? 1.16 : 1;
+  window.speechSynthesis.speak(utterance);
+}
+
 function Avatar({ item, className = '' }: { item: Entry; className?: string }) {
   return (
     <span className={`avatar avatar--${item.personality} ${className}`}>
@@ -30,10 +80,15 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   const [mobile, setMobile] = useState(false);
   const [reacting, setReacting] = useState(false);
   const [reactionCycle, setReactionCycle] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [reaction, setReaction] = useState('点击角色，让她回应你。双击进入完整档案。');
   const timerRef = useRef<number | null>(null);
   const reactionTimerRef = useRef<number | null>(null);
   const active = ENTRIES[activeIndex];
+
+  useEffect(() => {
+    setReaction('\u70b9\u51fb\u89d2\u8272\uff0c\u8ba9\u5979\u56de\u5e94\u4f60\u3002\u53cc\u51fb\u8fdb\u5165\u5b8c\u6574\u6863\u6848\u3002');
+  }, []);
 
   const release = useCallback(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
@@ -84,12 +139,24 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
   };
 
   const respond = () => {
-    const lines = reactions[active.personality];
-    setReaction(lines[Math.floor(Math.random() * lines.length)]);
+    const lines = dialogueLines[active.personality];
+    const line = lines[Math.floor(Math.random() * lines.length)];
+    setReaction(line);
     setReactionCycle((cycle) => cycle + 1);
     setReacting(true);
+    if (soundEnabled) {
+      playCharacterSfx(active.personality);
+      speakCharacterLine(line, active.personality);
+    }
     if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
     reactionTimerRef.current = window.setTimeout(() => setReacting(false), 820);
+  };
+
+  const toggleSound = () => {
+    setSoundEnabled((enabled) => {
+      if (enabled && typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+      return !enabled;
+    });
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -108,6 +175,10 @@ function Hero({ open }: { open: (entry: Entry) => void }) {
         <div className="hero__grain" />
         <div className="hero__ghost" aria-hidden="true">3D SHAPE</div>
         <div className="hero__brand">TOONHUB <span>/</span> SKILL ATLAS</div>
+        <button type="button" className={`hero__sound-toggle ${soundEnabled ? 'is-on' : 'is-off'}`} onClick={toggleSound} aria-pressed={soundEnabled} aria-label={soundEnabled ? '关闭角色音效与台词' : '开启角色音效与台词'}>
+          {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          <span>{soundEnabled ? '声音开启' : '声音静音'}</span>
+        </button>
 
         <div className="hero__intro">
           <span className="eyebrow">PERSONA LIBRARY <b>·</b> {ENTRIES.length} CHARACTERS</span>
