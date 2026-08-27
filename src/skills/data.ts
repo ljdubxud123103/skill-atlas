@@ -63,7 +63,9 @@ const HERO_KEYS = [
 ] as const;
 
 export const HERO_IMAGES = HERO_KEYS.map((key, index) => ({
-  src: LOCAL_AVATARS[key],
+  // The prompt's four cutout renders are transparent PNGs, so the hero reads as
+  // dimensional figures on the stage instead of framed portrait cards.
+  src: FIGURINES[index],
   bg: ['#F4845F', '#6BBF7A', '#E882B4', '#6EB5FF'][index],
   panel: ['#F79B7F', '#85CC92', '#ED9DC4', '#8DC4FF'][index],
 }));
